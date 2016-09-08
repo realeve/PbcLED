@@ -70,7 +70,7 @@ var app = (function() {
 			baseOption: {
 				nameMap: gb.nameMap,
 				backgroundColor: '#3c4656',
-				color:gb.color,
+				color: gb.color,
 				animation: true,
 				animationDuration: 1000,
 				animationEasing: 'cubicInOut',
@@ -507,7 +507,7 @@ var app = (function() {
 		//console.log(params);
 		if (params.componentType == 'series') { //市级
 			//window.open('http://map.baidu.com/?newmap=1&s=con%26wd%3D%E4%B8%AD%E5%9B%BD%E4%BA%BA%E6%B0%91%E9%93%B6%E8%A1%8C+' + encodeURIComponent(params.name + '分行') + '%26c%3D75&from=alamap&tpl=mapdots');
-			provnceName = getProvinceName(params.name);
+			provnceName = gb.getProvinceName(params.name);
 			getDataByProvince(provnceName, false);
 			curProvnceName = provnceName;
 		} else if (params.componentType == 'geo') { //省级
@@ -570,7 +570,7 @@ var app = (function() {
 					title: [{
 						id: 'curNum',
 						'text': "活动参与数 : " + (answerNum.num).toLocaleString(),
-						value:answerNum.num
+						value: answerNum.num
 					}, {
 						id: 'passedNum',
 						'text': "通过人数 : " + (answerNum.pass_num).toLocaleString()
@@ -580,7 +580,7 @@ var app = (function() {
 				options = _.sortBy(options, function(item) {
 					return item.title[0].value;
 				});
-				
+
 				option = getOption(options, max.num);
 
 				if (option && typeof option === "object") {
