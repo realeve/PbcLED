@@ -361,6 +361,7 @@ var app = (function() {
 			num: 0,
 			pass_num: 0
 		};
+		var sum = 0;
 		for (var key in obj) {
 			average.push({
 				name: key,
@@ -374,13 +375,14 @@ var app = (function() {
 				name: key,
 				value: obj[key].pass_num
 			});
-
+			sum += obj[key].num;
 			max.num = Math.max(max.num, obj[key].num);
 			max.pass_num = Math.max(max.pass_num, obj[key].pass_num);
 			max.average = Math.max(max.average, obj[key].average);
 			answerNum.num += obj[key].num;
 			answerNum.pass_num += obj[key].pass_num;
 		}
+		obj.sum = sum;
 		return {
 			average: average,
 			num: num,
@@ -545,6 +547,95 @@ var app = (function() {
 
 	}
 
+	var renderDataByID = function(apiUrl, i) {
+		$.ajax({
+			url: apiUrl + dateList[i],
+			async: false, //异步
+			dataType: "jsonp",
+			callback: "Jsonpcallback"
+		}).done(function(obj) {
+
+			var data = readData(obj);
+
+			hisData.push(data.hisData);
+			var numData = convertData(data.num);
+			options.push({
+				series: [{
+					data: numData
+				}, {
+					data: getTop10(numData, 20)
+				}],
+				title: [{
+					id: 'curNum',
+					'text': "活动参与数 : " + (answerNum.num).toLocaleString(),
+					value: answerNum.num
+				}, {
+					id: 'passedNum',
+					'text': "通过人数 : " + (answerNum.pass_num).toLocaleString()
+				}]
+			});
+
+			renderDataByOptions(true);
+		});
+	};
+
+	var renderDataByOptions = function(saveItem) {
+
+		hisData = _.sortBy(hisData, 'sum');
+
+		options = _.sortBy(options, function(item) {
+			var val = _.sortBy(item.series[0].data, 'value');
+			var len = val.length;
+			if (max.num < val[len - 1].value) {
+				max.num = val[len - 1].value;
+			}
+			return item.title[0].value;
+		});
+
+		option = getOption(options, max.num);
+
+		if (option && typeof option === "object") {
+			myChart.setOption(option, true);
+			gb.isChartInited = true;
+			handleBaiduMap();
+			$('[name="refreshTime"]').text('最近更新 ' + gb.now());
+		}
+
+		//数据全部读取完毕，开始缓存
+		if (options.length == currentIndex + 1) {
+			for (var i = 0; i < currentIndex; i++) {
+				if (saveItem) {
+					localStorage.setItem('hisData_city_' + dateList[i], JSON.stringify(options[i]));
+					localStorage.setItem('hisData_city_tips' + dateList[i], JSON.stringify(hisData[i]));
+				}
+			}
+		}
+	};
+
+
+	var getDataList2 = function() {
+
+		var apiUrl = 'https://pro.wenjuan.com/report/s8/5795736d585729fdc48ff59d/page2/?start_time=' + startDate + '&end_time=';
+
+		//最新信息不缓存
+		//renderDataByID(apiUrl, currentIndex);
+
+		for (var i = currentIndex + 1; i > 0; i--) {
+
+			var hisItem = localStorage['hisData_city_' + dateList[i - 1]];
+			var hisItemTips = localStorage['hisData_city_tips' + dateList[i - 1]];
+			if (typeof hisItem == 'undefined' || i == currentIndex + 1) {
+				renderDataByID(apiUrl, i);
+			} else {
+				//从本地缓存取值
+				hisItem = JSON.parse(hisItem);
+				options.push(hisItem);
+				hisData.push(JSON.parse(hisItemTips));
+				renderDataByOptions(false);
+			}
+		}
+	};
+
 	var getDataList = function() {
 
 		var apiUrl = 'https://pro.wenjuan.com/report/s8/5795736d585729fdc48ff59d/page2/?start_time=' + startDate + '&end_time=';
@@ -647,7 +738,7 @@ var app = (function() {
 	}
 
 	return {
-		init: getDataList,
+		init: getDataList2,
 		resize: function() {
 			myChart.resize();
 		}

@@ -368,6 +368,7 @@ var app = (function() {
 			num: 0,
 			pass_num: 0
 		};
+		var sum = 0;
 		for (var key in obj) {
 			average.push({
 				name: key,
@@ -381,13 +382,14 @@ var app = (function() {
 				name: key,
 				value: obj[key].pass_num
 			});
-
+			sum += obj[key].num;
 			max.num = Math.max(max.num, obj[key].num);
 			max.pass_num = Math.max(max.pass_num, obj[key].pass_num);
 			max.average = Math.max(max.average, obj[key].average);
 			answerNum.num += obj[key].num;
 			answerNum.pass_num += obj[key].pass_num;
 		}
+		obj.sum = sum;
 		return {
 			average: average,
 			num: num,
@@ -575,6 +577,8 @@ var app = (function() {
 
 	var renderDataByOptions = function(saveItem) {
 
+		hisData = _.sortBy(hisData, 'sum');
+
 		options = _.sortBy(options, function(item) {
 			var val = _.sortBy(item.series[0].data, 'value');
 			var len = val.length;
@@ -596,6 +600,7 @@ var app = (function() {
 			for (var i = 0; i < currentIndex; i++) {
 				if (saveItem) {
 					localStorage.setItem('hisData_province_' + dateList[i], JSON.stringify(options[i]));
+					localStorage.setItem('hisData_province_tips' + dateList[i], JSON.stringify(hisData[i]));
 				}
 			}
 		}
@@ -612,12 +617,14 @@ var app = (function() {
 		for (var i = currentIndex + 1; i > 0; i--) {
 
 			var hisItem = localStorage['hisData_province_' + dateList[i - 1]];
+			var hisItemTips = localStorage['hisData_province_tips' + dateList[i - 1]];
 			if (typeof hisItem == 'undefined' || i == currentIndex + 1) {
 				renderDataByID(apiUrl, i);
 			} else {
 				//从本地缓存取值
 				hisItem = JSON.parse(hisItem);
 				options.push(hisItem);
+				hisData.push(JSON.parse(hisItemTips));
 				renderDataByOptions(false);
 			}
 		}
@@ -636,6 +643,8 @@ var app = (function() {
 				success: function(obj) {
 					var data = readData(obj);
 					hisData.push(data.hisData);
+					hisData = _.sortBy(hisData, 'sum');
+
 					options.push({
 						series: [{
 							data: convertData(data.num)
@@ -711,7 +720,7 @@ var app = (function() {
 	}
 
 	return {
-		init: getDataList,
+		init: getDataList2,
 		resize: function() {
 			myChart.resize();
 		}
