@@ -20,6 +20,12 @@ var app = (function() {
 		pass_num: 0,
 		average: 0
 	};
+
+	var options = [];
+	var curProvnceName;
+	var curCityName;
+	var xData = [];
+
 	//各市历史数据，各省历史数据
 	var hisData = [],
 		provHisData = [];
@@ -70,7 +76,7 @@ var app = (function() {
 			baseOption: {
 				nameMap: gb.nameMap,
 				backgroundColor: '#3c4656',
-				color: gb.color,
+				//color: gb.color,
 				animation: true,
 				animationDuration: 1000,
 				animationEasing: 'cubicInOut',
@@ -129,8 +135,12 @@ var app = (function() {
 				tooltip: {
 					trigger: 'item',
 					formatter: function(params) {
-						var obj = hisData[currentIndex][params.name];
-						return params.name + ' <br>   参与人数：' + (obj.num).toLocaleString() + '<br>   通过人数：' + (obj.pass_num).toLocaleString() + '<br>   平均得分：' + obj.average;
+						if (params.seriesType == 'line') {
+							return curCityName + ' ' + params.name + '<br>参与人数:' + params.value;
+						} else {
+							var obj = hisData[currentIndex][params.name];
+							return params.name + ' <br>   参与人数：' + (obj.num).toLocaleString() + '<br>   通过人数：' + (obj.pass_num).toLocaleString() + '<br>   平均得分：' + obj.average;
+						}
 					}
 				},
 				legend: {
@@ -148,13 +158,19 @@ var app = (function() {
 				},
 				//geo: geo,
 				bmap: bmap,
-				grid: {
+				grid: [{
 					right: 20,
 					top: '40%',
 					bottom: 40,
 					width: '14%'
-				},
-				xAxis: {
+				}, {
+					"x": 'center',
+					"top": "70%",
+					"bottom": "5%",
+					"width": "60%",
+				}],
+				xAxis: [{
+					id: 'bar',
 					type: 'value',
 					scale: true,
 					position: 'top',
@@ -175,8 +191,16 @@ var app = (function() {
 							color: '#aaa'
 						}
 					},
-				},
-				yAxis: {
+					gridIndex: 0
+				}, {
+					id: 'line',
+					boundaryGap: false,
+					show: false,
+					type: 'category',
+					gridIndex: 1
+				}],
+				yAxis: [{
+					id: 'bar',
 					type: 'category',
 					//name: 'TOP 20',
 					nameGap: 16,
@@ -198,8 +222,16 @@ var app = (function() {
 							color: '#ddd'
 						}
 					},
-					data: []
-				},
+					data: [],
+					gridIndex: 0
+				}, {
+					id: 'line',
+					type: 'value',
+					position: 'left',
+					boundaryGap: false,
+					show: false,
+					gridIndex: 1
+				}],
 				visualMap: {
 					min: 0,
 					max: Math.ceil(max / 1000) * 1000,
@@ -274,6 +306,8 @@ var app = (function() {
 					zlevel: 1
 				}, {
 					id: 'bar1',
+					xAxisIndex: 0,
+					yAxisIndex: 0,
 					name: '通过',
 					stack: '参与人数',
 					zlevel: 2,
@@ -293,6 +327,8 @@ var app = (function() {
 					barMaxWidth: 40
 				}, {
 					id: 'bar2',
+					xAxisIndex: 0,
+					yAxisIndex: 0,
 					name: '未通过',
 					stack: '参与人数',
 					zlevel: 2,
@@ -310,6 +346,55 @@ var app = (function() {
 					},
 					data: [],
 					barMaxWidth: 40
+				}, {
+					id: 'line',
+					xAxisIndex: 1,
+					yAxisIndex: 1,
+					z: 10,
+					min: 0,
+					type: 'line',
+					legendHoverLink: true,
+					itemStyle: {
+						emphasis: {
+							opacity: 1,
+							borderColor: 'rgba(255,255,255,0.8)',
+							borderWidth: '8'
+						},
+						normal: {
+							borderColor: '#ffe',
+							borderWidth: '4'
+						}
+					},
+					lineStyle: {
+						normal: {
+							color: '#df0040',
+							width: '2'
+						}
+					},
+					symbol: 'circle',
+					symbolSize: 15,
+					smooth: true,
+					markPoint: {
+						label: {
+							normal: {
+								formatter: function(param) {
+									var x = param.data.coord[0];
+									return curCityName + ':\n' + param.value + ' 人(' + xData[x] + ')';
+								}
+							}
+						},
+						data: [{
+							type: 'max',
+							name: '最大值'
+						}],
+						symbol: 'circle',
+						symbolOffset: [0, -30],
+						itemStyle: {
+							normal: {
+								color: 'rgba(0,0,0,0)'
+							}
+						}
+					}
 				}]
 			},
 			timeline: {
@@ -415,8 +500,6 @@ var app = (function() {
 		return res;
 	}
 
-	var options = [];
-
 	function renderBarData(obj, city) {
 
 		var barData = [],
@@ -450,15 +533,17 @@ var app = (function() {
 		}
 
 		myChart.setOption({
-			yAxis: {
+			yAxis: [{
+				id: 'bar',
 				data: categoryData
-			},
-			xAxis: {
+			}],
+			xAxis: [{
+				id: 'bar',
 				axisLabel: {
 					show: false //!!count
 				},
 				min: 0
-			},
+			}],
 			title: {
 				id: 'statistic',
 				text: count ? city + '  ( ' + (passSum).toLocaleString() + '/' + (sum).toLocaleString() + ' ) 人通过' : '' //' 截止至' + dateList[currentIndex] +
@@ -474,31 +559,66 @@ var app = (function() {
 	}
 
 	function getDataByProvince(city, real) {
-		var pName = city;
+		//获取历史曲线
+		getHisDataByCity();
 
 		var apiUrl = 'https://pro.wenjuan.com/report/s8/5795736d585729fdc48ff59d/page3/?start_time=' + startDate + '&end_time=';
 		if (!real && typeof provHisData[currentIndex] != 'undefined' &&
-			typeof provHisData[currentIndex][pName] != 'undefined') {
-
+			typeof provHisData[currentIndex][city] != 'undefined') {
 			//缓存历史数据
-			renderBarData(provHisData[currentIndex][pName], pName);
-
+			renderBarData(provHisData[currentIndex][city], city);
 		} else { //载入数据
 			$.ajax({
-				url: apiUrl + dateList[currentIndex + 1] + '&province=' + pName,
+				url: apiUrl + dateList[currentIndex + 1] + '&province=' + city,
 				async: false, //异步
 				dataType: "jsonp",
 				callback: "Jsonpcallback"
 			}).done(function(obj) {
 				provHisData[currentIndex] = {};
-				provHisData[currentIndex][pName] = obj;
-				renderBarData(obj, pName);
+				provHisData[currentIndex][city] = obj;
+				renderBarData(obj, city);
 			});
 		}
 
 	}
 
-	var curProvnceName;
+	function getHisDataByCity() {
+
+		var apiUrl = 'https://pro.wenjuan.com/report/s8/5795736d585729fdc48ff59d/page4/?type=1&name=' + curCityName;
+
+		$.ajax({
+			url: apiUrl,
+			async: false, //异步
+			dataType: "jsonp",
+			callback: "Jsonpcallback"
+		}).done(function(obj) {
+			var data = obj.data;
+			xData = [];
+			var lineData = [];
+			data.map(function(item) {
+				xData.push(item[0]);
+				lineData.push(item[1]);
+			});
+			var tLen = timeLineData.length;
+			var days = lineData.length;
+			if (days > tLen) {
+				xData = xData.slice(days - tLen);
+				lineData = lineData.slice(days - tLen);
+			}
+			var option = {
+				xAxis: [{
+					id: 'line',
+					data: xData
+				}],
+				series: [{
+					id: 'line',
+					name: curCityName,
+					data: lineData
+				}]
+			};
+			myChart.setOption(option);
+		});
+	}
 
 	function refreshBarData(real) {
 		if (typeof curProvnceName != 'undefined') {
@@ -506,7 +626,7 @@ var app = (function() {
 		}
 	}
 	myChart.on('click', function(params) {
-		//console.log(params);
+		curCityName = (params.name);
 		if (params.componentType == 'series') { //市级
 			//window.open('http://map.baidu.com/?newmap=1&s=con%26wd%3D%E4%B8%AD%E5%9B%BD%E4%BA%BA%E6%B0%91%E9%93%B6%E8%A1%8C+' + encodeURIComponent(params.name + '分行') + '%26c%3D75&from=alamap&tpl=mapdots');
 			provnceName = gb.getProvinceName(params.name);

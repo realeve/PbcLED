@@ -119,10 +119,10 @@ var app = (function() {
 					trigger: 'item',
 					formatter: function(params) {
 						var obj;
-						if (params.componentSubType == 'map') {
+						if (params.seriesType == 'map') {
 							if (params.seriesIndex == 2) {
-								if (typeof provHisData[currentIndex][curProvnceName] != 'undefined') {
-									obj = provHisData[currentIndex][curProvnceName];
+								if (typeof provHisData[currentIndex][curProvinceName] != 'undefined') {
+									obj = provHisData[currentIndex][curProvinceName];
 								}
 								if (typeof obj[params.name] != 'undefined') {
 									obj = obj[params.name];
@@ -130,13 +130,15 @@ var app = (function() {
 							} else {
 								obj = hisData[currentIndex][params.name]; //[gb.convertProvinceName2API(params.name)];
 							}
-						} else if (params.componentSubType == 'bar') {
-							if (typeof provHisData[currentIndex][curProvnceName] != 'undefined') {
-								obj = provHisData[currentIndex][curProvnceName];
+						} else if (params.seriesType == 'bar') {
+							if (typeof provHisData[currentIndex][curProvinceName] != 'undefined') {
+								obj = provHisData[currentIndex][curProvinceName];
 							}
 							if (typeof obj[params.name] != 'undefined') {
 								obj = obj[params.name];
 							}
+						} else if (params.seriesType == 'line') {
+							return curLineName + ' ' + params.name + '<br>参与人数:' + params.value;
 						}
 						//console.log(obj);
 						if (typeof obj == 'undefined' || typeof obj.num == 'undefined') {
@@ -146,13 +148,19 @@ var app = (function() {
 						}
 					}
 				},
-				grid: {
+				grid: [{
 					right: 20,
 					top: '45%',
 					bottom: 40,
 					width: '14%'
-				},
-				xAxis: {
+				}, {
+					"x": 'center',
+					"top": "70%",
+					"bottom": "5%",
+					"width": "60%",
+				}],
+				xAxis: [{
+					id: "bar",
 					type: 'value',
 					scale: true,
 					position: 'top',
@@ -173,8 +181,16 @@ var app = (function() {
 							color: '#aaa'
 						}
 					},
-				},
-				yAxis: {
+					gridIndex: 0
+				}, {
+					id: 'line',
+					boundaryGap: false,
+					show: false,
+					type: 'category',
+					gridIndex: 1
+				}],
+				yAxis: [{
+					id: "bar",
 					type: 'category',
 					//name: 'TOP 20',
 					nameGap: 16,
@@ -196,8 +212,16 @@ var app = (function() {
 							color: '#ddd'
 						}
 					},
-					data: []
-				},
+					data: [],
+					gridIndex: 0
+				}, {
+					id: 'line',
+					type: 'value',
+					position: 'left',
+					boundaryGap: false,
+					show: false,
+					gridIndex: 1
+				}],
 				visualMap: [{
 					min: 0,
 					max: Math.ceil(max / 1000) * 1000,
@@ -318,6 +342,55 @@ var app = (function() {
 					right: 'auto',
 					top: '10',
 					bottom: '58%'
+				}, {
+					id: 'line',
+					xAxisIndex: 1,
+					yAxisIndex: 1,
+					z: 10,
+					min: 0,
+					type: 'line',
+					legendHoverLink: true,
+					itemStyle: {
+						emphasis: {
+							opacity: 1,
+							borderColor: 'rgba(255,255,255,0.8)',
+							borderWidth: '8'
+						},
+						normal: {
+							borderColor: '#ffe',
+							borderWidth: '4'
+						}
+					},
+					lineStyle: {
+						normal: {
+							color: '#df0040',
+							width: '2'
+						}
+					},
+					symbol: 'circle',
+					symbolSize: 15,
+					smooth: true,
+					markPoint: {
+						label: {
+							normal: {
+								formatter: function(param) {
+									var x = param.data.coord[0];
+									return curLineName + ':\n' + param.value + ' 人(' + xData[x] + ')';
+								}
+							}
+						},
+						data: [{
+							type: 'max',
+							name: '最大值'
+						}],
+						symbol: 'circle',
+						symbolOffset: [0, -30],
+						itemStyle: {
+							normal: {
+								color: 'rgba(0,0,0,0)'
+							}
+						}
+					}
 				}]
 			},
 			timeline: {
@@ -451,15 +524,17 @@ var app = (function() {
 		}
 
 		myChart.setOption({
-			yAxis: {
+			yAxis: [{
+				id: 'bar',
 				data: categoryData
-			},
-			xAxis: {
+			}],
+			xAxis: [{
+				id: 'bar',
 				axisLabel: {
 					show: false //!!count
 				},
 				min: 0
-			},
+			}],
 			title: {
 				id: 'statistic',
 				text: count ? gb.convertProvinceName2API(city) + ' \n\n' + (passSum).toLocaleString() + '/' + (sum).toLocaleString() : '' //' 截止至' + dateList[currentIndex] +
@@ -519,20 +594,36 @@ var app = (function() {
 
 	}
 
-	var curProvnceName;
+	var curProvinceName;
+	var curLineName;
+	var xData = [];
+	var curType = 0;
 
 	function refreshBarData(real) {
-		if (typeof curProvnceName != 'undefined') {
-			getDataByProvince(curProvnceName, real);
+		if (typeof curProvinceName != 'undefined') {
+			getDataByProvince(curProvinceName, real);
 		}
 	}
 	myChart.on('click', function(params) {
 		//console.log(params);
 		if (params.componentType == 'series' && params.componentSubType == 'map') { //省级
+
+			curType = 0;
+			curLineName = params.name;
 			if (typeof gb.provinceList[params.name] != 'undefined') {
+				getHisDataByCity(curLineName);
 				getDataByProvince(params.name, false);
-				curProvnceName = params.name;
+				curProvinceName = params.name;
+			} else {
+
+				curType = 1;
+				getHisDataByCity(curLineName);
 			}
+
+		} else if (params.componentType == 'series' && params.componentSubType == 'bar') {
+			curType = 1;
+			curLineName = params.name;
+			getHisDataByCity(curLineName);
 		} else if (params.componentType == 'timeline') { //点击timeline
 			refreshBarData(false);
 		}
@@ -542,6 +633,45 @@ var app = (function() {
 		currentIndex = params.currentIndex;
 		refreshBarData(false);
 	});
+
+	function getHisDataByCity(city) {
+
+		var apiUrl = 'https://pro.wenjuan.com/report/s8/5795736d585729fdc48ff59d/page4/?type=' + curType + '&name=' + city;
+
+
+		$.ajax({
+			url: apiUrl,
+			async: false, //异步
+			dataType: "jsonp",
+			callback: "Jsonpcallback"
+		}).done(function(obj) {
+			var data = obj.data;
+			xData = [];
+			var lineData = [];
+			data.map(function(item) {
+				xData.push(item[0]);
+				lineData.push(item[1]);
+			});
+			var tLen = timeLineData.length;
+			var days = lineData.length;
+			if (days > tLen) {
+				xData = xData.slice(days - tLen);
+				lineData = lineData.slice(days - tLen);
+			}
+			var option = {
+				xAxis: [{
+					id: 'line',
+					data: xData
+				}],
+				series: [{
+					id: 'line',
+					name: curLineName,
+					data: lineData
+				}]
+			};
+			myChart.setOption(option);
+		});
+	}
 
 	var renderDataByID = function(apiUrl, i) {
 		$.ajax({
